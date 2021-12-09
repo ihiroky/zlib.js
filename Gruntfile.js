@@ -67,7 +67,8 @@ module.exports = function(grunt) {
               'visibility'
             ],
             output_wrapper:
-              '"' + license + '(function() {%output%}).call(this);"'
+              '"' + license + '(function() {%output%}).call(this);"',
+            externs: './extern.js'
           }
         }
       }, (function() {

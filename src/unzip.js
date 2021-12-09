@@ -47,6 +47,8 @@ Zlib.Unzip = function(input, opt_params) {
   this.verify = opt_params['verify'] || false;
   /** @type {(Array.<number>|Uint8Array)} */
   this.password = opt_params['password'];
+  /** @type {boolean} */
+  this.utf8 = opt_params['utf8'];
 };
 
 Zlib.Unzip.CompressionMethod = Zlib.Zip.CompressionMethod;
@@ -123,7 +125,7 @@ Zlib.Unzip.FileHeader = function(input, ip) {
   this.comment;
 };
 
-Zlib.Unzip.FileHeader.prototype.parse = function() {
+Zlib.Unzip.FileHeader.prototype.parse = function(utf8) {
   /** @type {!(Array.<number>|Uint8Array)} */
   var input = this.input;
   /** @type {number} */
@@ -201,10 +203,17 @@ Zlib.Unzip.FileHeader.prototype.parse = function() {
   ) >>> 0;
 
   // file name
-  this.filename = String.fromCharCode.apply(null, USE_TYPEDARRAY ?
-    input.subarray(ip, ip += this.fileNameLength) :
-    input.slice(ip, ip += this.fileNameLength)
-  );
+  if (!utf8) {
+    this.filename = String.fromCharCode.apply(null, USE_TYPEDARRAY ?
+      input.subarray(ip, ip += this.fileNameLength) :
+      input.slice(ip, ip += this.fileNameLength)
+    );
+  } else {
+    this.filename = new TextDecoder().decode(USE_TYPEDARRAY
+      ? input.subarray(ip, ip += this.fileNameLength)
+      : input.slice(ip, ip += this.fileNameLength)
+    );
+  }
 
   // extra field
   this.extraField = USE_TYPEDARRAY ?
@@ -259,7 +268,7 @@ Zlib.Unzip.LocalFileHeader = function(input, ip) {
 
 Zlib.Unzip.LocalFileHeader.Flags = Zlib.Zip.Flags;
 
-Zlib.Unzip.LocalFileHeader.prototype.parse = function() {
+Zlib.Unzip.LocalFileHeader.prototype.parse = function(utf8) {
   /** @type {!(Array.<number>|Uint8Array)} */
   var input = this.input;
   /** @type {number} */
@@ -313,10 +322,17 @@ Zlib.Unzip.LocalFileHeader.prototype.parse = function() {
   this.extraFieldLength = input[ip++] | (input[ip++] << 8);
 
   // file name
-  this.filename = String.fromCharCode.apply(null, USE_TYPEDARRAY ?
-    input.subarray(ip, ip += this.fileNameLength) :
-    input.slice(ip, ip += this.fileNameLength)
-  );
+  if (!utf8) {
+    this.filename = String.fromCharCode.apply(null, USE_TYPEDARRAY ?
+      input.subarray(ip, ip += this.fileNameLength) :
+      input.slice(ip, ip += this.fileNameLength)
+    );
+  } else {
+    this.filename = new TextDecoder().decode(USE_TYPEDARRAY
+      ? input.subarray(ip, ip += this.fileNameLength)
+      : input.slice(ip, ip += this.fileNameLength)
+    );
+  }
 
   // extra field
   this.extraField = USE_TYPEDARRAY ?
@@ -423,7 +439,7 @@ Zlib.Unzip.prototype.parseFileHeader = function() {
 
   for (i = 0, il = this.totalEntries; i < il; ++i) {
     fileHeader = new Zlib.Unzip.FileHeader(this.input, ip);
-    fileHeader.parse();
+    fileHeader.parse(this.utf8);
     ip += fileHeader.length;
     filelist[i] = fileHeader;
     filetable[fileHeader.filename] = i;
@@ -475,7 +491,7 @@ Zlib.Unzip.prototype.getFileData = function(index, opt_params) {
 
   offset = fileHeaderList[index].relativeOffset;
   localFileHeader = new Zlib.Unzip.LocalFileHeader(this.input, offset);
-  localFileHeader.parse();
+  localFileHeader.parse(this.utf8);
   offset += localFileHeader.length;
   length = localFileHeader.compressedSize;
 
